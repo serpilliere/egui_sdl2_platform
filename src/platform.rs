@@ -47,7 +47,7 @@ impl Platform {
     }
 
     /// Handle a sdl2 event
-    pub fn handle_event(&mut self, event: &Event, sdl: &sdl2::Sdl, video: &sdl2::VideoSubsystem) {
+    pub fn handle_event(&mut self, event: &Event, sdl: &sdl2::Sdl, video: &sdl2::VideoSubsystem) -> (bool, bool) {
         match event {
             // Handle reizing
             Event::Window { win_event, .. } => match win_event {
@@ -59,8 +59,11 @@ impl Platform {
                             y: *h as f32,
                         },
                     ));
+                    (false, false)
                 }
-                _ => {}
+                _ => {
+                    (false, false)
+                }
             },
 
             // Handle the mouse button being held down
@@ -79,7 +82,7 @@ impl Platform {
                         modifiers: self.modifiers,
                     });
                 }
-                self.egui_ctx.wants_pointer_input();
+                (self.egui_ctx.wants_pointer_input(), false)
             }
             // Handle the mouse button being released
             Event::MouseButtonUp { mouse_btn, .. } => {
@@ -97,7 +100,7 @@ impl Platform {
                         modifiers: self.modifiers,
                     });
                 }
-                self.egui_ctx.wants_pointer_input();
+                (self.egui_ctx.wants_pointer_input(), false)
             }
             // Handle mouse motion
             Event::MouseMotion { x, y, .. } => {
@@ -106,7 +109,7 @@ impl Platform {
                 self.raw_input
                     .events
                     .push(egui::Event::PointerMoved(self.pointer_pos));
-                self.egui_ctx.wants_pointer_input();
+                (self.egui_ctx.wants_pointer_input(), false)
             }
             // Handle the mouse scrolling
             Event::MouseWheel { x, y, .. } => {
@@ -121,9 +124,17 @@ impl Platform {
                 self.raw_input.events.push(if left_ctrl || right_ctrl {
                     egui::Event::Zoom((delta.y / 125.0).exp())
                 } else {
-                    egui::Event::Scroll(delta)
+                    //egui::Event::Scroll(delta)
+                    egui::Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Line,
+                        delta: egui::Vec2 {
+                            x: delta.x,
+                            y: delta.y,
+                        },
+                        modifiers:egui::Modifiers::default(),
+                    }
                 });
-                self.egui_ctx.wants_pointer_input();
+                (self.egui_ctx.wants_pointer_input(), false)
             }
 
             // Handle a key being pressed
@@ -173,13 +184,14 @@ impl Platform {
                         // Push the event
                         self.raw_input.events.push(egui::Event::Key {
                             key,
+                            physical_key: None,
                             pressed: true,
                             repeat: false,
                             modifiers: self.modifiers,
                         });
                     }
                 }
-                self.egui_ctx.wants_keyboard_input();
+                (false, self.egui_ctx.wants_keyboard_input())
             }
             // Handle a key being released
             Event::KeyUp {
@@ -213,21 +225,24 @@ impl Platform {
                         // Push the event
                         self.raw_input.events.push(egui::Event::Key {
                             key,
+                            physical_key: None,
                             pressed: false,
                             repeat: false,
                             modifiers: self.modifiers,
                         });
                     }
                 }
-                self.egui_ctx.wants_keyboard_input();
+                (false, self.egui_ctx.wants_keyboard_input())
             }
             // Handle text input
             Event::TextInput { text, .. } => {
                 self.raw_input.events.push(egui::Event::Text(text.clone()));
-                self.egui_ctx.wants_keyboard_input();
+                (false, self.egui_ctx.wants_keyboard_input())
             }
 
-            _ => {}
+            _ => {
+                (false, false)
+            }
         }
     }
 
@@ -295,6 +310,6 @@ impl Platform {
 
     /// Tessellate the egui frame
     pub fn tessellate(&self, full_output: &egui::FullOutput) -> Vec<egui::ClippedPrimitive> {
-        self.egui_ctx.tessellate(full_output.shapes.clone())
+        self.egui_ctx.tessellate(full_output.shapes.clone(), full_output.pixels_per_point)
     }
 }
